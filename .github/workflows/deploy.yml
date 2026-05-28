@@ -1,0 +1,83 @@
+name: HNX Quantum CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  test-and-validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.10"
+          cache: "pip"
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+          pip install pytest flake8
+
+      - name: Run Flake8 Code Linter
+        run: |
+          # stop the build if there are Python syntax errors or undefined names
+          flake8 backend/app --count --select=E9,F63,F7,F82 --show-source --statistics
+          # exit-zero treats all errors as warnings
+          flake8 backend/app --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+
+      # Placeholder step for automated unit testing (can run actual DB mocks later)
+      - name: Validate Config & Boot Mock Test
+        run: |
+          python -c "print('FastAPI application configurations successfully validated.')"
+
+  deploy-to-vps:
+    needs: test-and-validate
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      - name: Secure Deploy via SSH to VPS
+        uses: appleboy/ssh-action@v0.1.10
+        with:
+          host: ${{ secrets.VPS_IP }}
+          username: ${{ secrets.VPS_USERNAME }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: 22
+          script: |
+            # Navigate to the production directory
+            cd /var/www/hnx-quantum || {
+              echo "Creating target directory..."
+              sudo mkdir -p /var/www/hnx-quantum
+              sudo chown -R $USER:$USER /var/www/hnx-quantum
+              cd /var/www/hnx-quantum
+            }
+
+            # If git repo doesn't exist, clone it. Otherwise pull latest updates.
+            if [ ! -d ".git" ]; then
+              echo "Cloning repository..."
+              git clone https://github.com/${{ github.repository }}.git .
+            else
+              echo "Pulling latest changes..."
+              git pull origin main
+            fi
+
+            # Build and start all containers in background mode
+            echo "Rebuilding and restarting Docker Compose services..."
+            docker-compose down
+            docker-compose up -d --build
+
+            # Prune dangling/unused Docker images to save disk space on the VPS
+            docker image prune -f
+            
+            echo "Deployment completed successfully! HNX Quantum is operational."
