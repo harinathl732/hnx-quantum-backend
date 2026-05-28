@@ -1,0 +1,36 @@
+# Credentials and Private environment variables
+.env
+.env.*
+!.env.example
+.access_token
+access_token.txt
+
+# Python cache and build files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+pip-log.txt
+pip-delete-this-directory.txt
+.toast
+.cache/
+.pytest_cache/
+.mypy_cache/
+
+# System specific files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Docker volume caches (if any are saved locally)
+postgres_data/
+redis_data/
+var/
+logs/
